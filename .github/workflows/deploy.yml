@@ -39,5 +39,6 @@ jobs:
             --token $SHINYAPPS_TOKEN \
             --secret $SHINYAPPS_SECRET
 
-          rsconnect deploy shiny src --name harrisonlee0530 --title gallery-labels
+          rsconnect deploy shiny src --title gallery-labels
+
 
