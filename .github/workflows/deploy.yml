@@ -1,0 +1,39 @@
+name: Deploy to shinyapps.io
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          conda env create -f environment.yml
+          conda activate gallery-labels
+
+      - name: Deploy to shinyapps.io
+        env:
+          SHINYAPPS_TOKEN: ${{ secrets.SHINYAPPS_TOKEN }}
+          SHINYAPPS_SECRET: ${{ secrets.SHINYAPPS_SECRET }}
+        run: |
+          rsconnect add \
+            --name shinyapps \
+            --server shinyapps.io \
+            --token $SHINYAPPS_TOKEN \
+            --secret $SHINYAPPS_SECRET
+
+          rsconnect deploy shiny src --force
