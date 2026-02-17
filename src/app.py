@@ -176,7 +176,100 @@ def server(input, output, session):
 
         return elements
 
-    
+    # ---------- PDF Download ----------
+
+    @output
+    @render.download(filename="gallery-labels-print-ready.pdf")
+    def download_pdf():
+
+        from reportlab.lib.units import mm
+        from reportlab.platypus import Paragraph, Image as RLImage
+        from reportlab.pdfgen import canvas
+        import io
+        import base64
+
+        pdfmetrics.registerFont(UnicodeCIDFont("STSong-Light"))
+
+        buffer = io.BytesIO()
+        c = canvas.Canvas(buffer, pagesize=A4)
+
+        page_width, page_height = A4
+
+        card_width = 105 * mm
+        card_height = 74.25 * mm
+
+        cols = 2
+        rows = 4
+
+        style = ParagraphStyle(
+            name="Chinese",
+            fontName="STSong-Light",
+            fontSize=14,
+            leading=18
+        )
+
+        cards_data = list(cards.get().values())
+
+        for index, content in enumerate(cards_data):
+
+            position = index % 8
+            col = position % cols
+            row = position // cols
+
+            x = col * card_width
+            y = page_height - ((row + 1) * card_height)
+
+            # Draw card border
+            c.rect(x, y, card_width, card_height)
+
+            # Internal padding
+            padding = 8 * mm
+            cursor_y = y + card_height - padding
+
+            # ---- Header Image ----
+            if HEADER_BASE64:
+                img_data = base64.b64decode(HEADER_BASE64)
+                img_buffer = io.BytesIO(img_data)
+
+                img_width = 60 * mm
+                img = RLImage(img_buffer)
+                scale = img_width / img.imageWidth
+                img.drawWidth = img_width
+                img.drawHeight = img.imageHeight * scale
+
+                img_x = x + (card_width - img_width) / 2
+                img_y = cursor_y - img.drawHeight
+
+                img.drawOn(c, img_x, img_y)
+
+                # Move cursor below image
+                cursor_y = img_y - 6 * mm
+
+            # ---- Text Content ----
+            size_display = f"{content['height']} cm x {content['width']} cm"
+
+            text_content = f"""
+            作品名稱: {content['title']}<br/>
+            作者: {content['author']}<br/>
+            尺寸: {size_display}<br/>
+            創作媒材: {content['medium']}
+            """
+
+            paragraph = Paragraph(text_content, style)
+
+            text_width = card_width - 2 * padding
+            text_height = card_height
+
+            paragraph.wrapOn(c, text_width, text_height)
+            paragraph.drawOn(c, x + padding, cursor_y - paragraph.height)
+
+            # New page every 8 cards
+            if position == 7:
+                c.showPage()
+
+        c.save()
+        buffer.seek(0)
+        yield buffer.read()
 
 
 # ---------- App ----------
