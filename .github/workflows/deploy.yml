@@ -21,26 +21,21 @@ jobs:
           python-version: 3.11
           activate-environment: gallery-labels
           environment-file: environment.yml
-
-      - name: Cache conda packages
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.conda/pkgs
-            ~/.conda/envs/gallery-labels
-          key: ${{ runner.os }}-conda-${{ hashFiles('environment.yml') }}
-          restore-keys: |
-            ${{ runner.os }}-conda-
+          channels: conda-forge
+          cache-path: ~/.conda/envs/gallery-labels # cache the environment
+          cache-name: gallery-labels
 
       - name: Deploy to shinyapps.io
         shell: bash -l {0}
         env:
+          SHINYAPPS_ACCOUNT: ${{ secrets.SHINYAPPS_ACCOUNT }}
           SHINYAPPS_TOKEN: ${{ secrets.SHINYAPPS_TOKEN }}
           SHINYAPPS_SECRET: ${{ secrets.SHINYAPPS_SECRET }}
         run: |
           rsconnect add \
             --name shinyapps \
             --server shinyapps.io \
+            --account $SHINYAPPS_ACCOUNT \
             --token $SHINYAPPS_TOKEN \
             --secret $SHINYAPPS_SECRET
 
