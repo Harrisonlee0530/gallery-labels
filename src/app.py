@@ -269,7 +269,6 @@ def server(input, output, session):
         return elements
 
     # ---------- PDF Download ----------
-
     @output
     @render.download(filename="gallery-labels-print-ready.pdf")
     def download_pdf():
@@ -332,7 +331,7 @@ def server(input, output, session):
             size_display = f"{content['height']} cm x {content['width']} cm"
             comments_text = content.get("comments", "")
             if not comments_text:
-                # Empty comment → use white color
+                # Empty comment -> use white color
                 comment_color = colors.white
             else:
                 comment_color = colors.black
