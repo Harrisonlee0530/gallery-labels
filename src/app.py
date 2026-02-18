@@ -6,9 +6,10 @@ import base64
 import tempfile
 import pandas as pd
 import datetime
-from datetime import datetime as dd
+from reportlab.lib import colors
 from reportlab.lib.units import mm
 from reportlab.pdfgen import canvas
+from datetime import datetime as dd
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfbase import pdfmetrics
 from reportlab.platypus import Image as RLImage
@@ -33,10 +34,10 @@ def format_date(raw_date):
     """
     if not raw_date:
         return ""
-    
+
     # Replace different delimiters with '/'
     raw_date = raw_date.replace("-", "/").replace(".", "/")
-    
+
     # Try parsing the date
     for fmt in ("%Y/%m/%d", "%Y/%d/%m", "%d/%m/%Y", "%m/%d/%Y"):
         try:
@@ -44,7 +45,7 @@ def format_date(raw_date):
             return parsed.strftime("%Y/%m/%d")  # zero-padded
         except ValueError:
             continue
-    
+
     # fallback: return raw if parsing fails
     return raw_date
 
@@ -109,14 +110,30 @@ app_ui = ui.page_fluid(
     ),
     ui.layout_sidebar(
         ui.sidebar(
+            ui.h2("Gallery Labels Generator"),  # Page title
+            ui.accordion(
+                ui.accordion_panel(
+                    "Instructions / 說明",
+                    ui.tags.p(
+                        "Upload a CSV or manually fill in fields to generate artwork labels. "
+                        "Cards are printed 2 columns x 4 rows on A4 paper."
+                    ),
+                    ui.tags.p(
+                        "請上傳 CSV 或手動填寫欄位生成畫作標籤。"
+                        "每張卡片將列印在 A4 紙上，2 列 x 4 行排列。"
+                    ),
+                    open=True,
+                )
+            ),
             ui.input_file("csv_upload", "上傳 CSV", accept=[".csv"]),
             ui.hr(),
             ui.input_text("title", "作品名稱"),
-            ui.input_text("author", "作者"),
+            # ui.input_text("author", "作者"),
             ui.input_text("height", "高度 (cm)"),
             ui.input_text("width", "寬度 (cm)"),
             ui.input_text("medium", "創作媒材"),
             ui.input_date("date", "創作日期", value=str(datetime.date.today())),
+            ui.input_text_area("comments", "備註", rows=2),
             ui.input_numeric("quantity", "數量", value=1, min=1, step=1),
             ui.input_action_button("add", "Add Card"),
             ui.hr(),
@@ -124,6 +141,11 @@ app_ui = ui.page_fluid(
             ui.input_action_button("delete", "Delete Card"),
             ui.hr(),
             ui.download_button("download_pdf", "Download PDF"),
+            # ---------- Last Updated ----------
+            ui.tags.p(
+                f"Last Updated: {datetime.datetime.now().strftime('%Y/%m/%d %H:%M %Z')}",
+                style="font-size:12pt; margin-top:20px; color: gray;",
+            ),
         ),
         ui.div({"class": "card-container"}, ui.output_ui("card_display")),
     ),
@@ -143,9 +165,19 @@ def server(input, output, session):
         # Read file, replace delimiters with comma
         with open(file[0]["datapath"], "r", encoding="utf-8") as f:
             content = f.read()
-            content = content.replace("，", ",").replace(";", ",").replace("\t", ",").replace(", ", ",")  # replace ; or tab
-            content = content.replace("（", " (").replace("）", ") ") # replace full sized paranthesis
+            content = (
+                content.replace("，", ",")
+                .replace(";", ",")
+                .replace("\t", ",")
+                .replace(", ", ",")
+            )  # replace ; or tab
+            content = content.replace("（", " (").replace(
+                "）", ") "
+            )  # replace full sized paranthesis
             df = pd.read_csv(io.StringIO(content), delimiter=",", comment="#")
+
+        # Fill missing values with empty string
+        df = df.fillna("")
 
         data = cards.get().copy()
 
@@ -154,11 +186,12 @@ def server(input, output, session):
 
             data[cid] = {
                 "title": str(row.get("title", "")),
-                "author": str(row.get("author", "")),
+                # "author": str(row.get("author", "")),
                 "height": str(row.get("height", "")),
                 "width": str(row.get("width", "")),
                 "medium": str(row.get("medium", "")),
                 "date": format_date(str(row.get("date", ""))),
+                "comments": str(row.get("comments", "")),
             }
 
         cards.set(data)
@@ -178,11 +211,12 @@ def server(input, output, session):
             cid = str(uuid.uuid4())[:8]
             data[cid] = {
                 "title": input.title(),
-                "author": input.author(),
+                # "author": input.author(),
                 "height": input.height(),
                 "width": input.width(),
                 "medium": input.medium(),
                 "date": date_value,
+                "comments": input.comments(),
             }
 
         cards.set(data)
@@ -230,16 +264,20 @@ def server(input, output, session):
         for cid, content in cards.get().items():
 
             size_display = f"{content['height']} cm x {content['width']} cm"
+            comment_text = content.get("comments", "")
+            comment_style = {"color": "black"} if comment_text else {"color": "white"}
 
             card = ui.div(
                 {"class": "art-card"},
                 ui.tags.img(src=f"data:image/png;base64,{HEADER_BASE64}"),
                 ui.div({"class": "card-line"}, f"作品名稱: {content['title']}"),
-                ui.div({"class": "card-line"}, f"作   者: {content['author']}"),
+                # ui.div({"class": "card-line"}, f"作   者: {content['author']}"),
                 ui.div({"class": "card-line"}, f"尺   寸: {size_display}"),
                 ui.div({"class": "card-line"}, f"創作媒材: {content['medium']}"),
+                ui.div({"class": "card-line"}, f"創作日期: {content.get('date', '')}"),
                 ui.div(
-                    {"class": "card-line"}, f"創作日期: {content.get('date', '')}"
+                    {"class": "card-line", "style": f"color: {comment_style['color']}"},
+                    f"備註\t: {comment_text or ' '}",
                 ),
             )
 
@@ -309,13 +347,19 @@ def server(input, output, session):
 
             # ---- Text Content ----
             size_display = f"{content['height']} cm x {content['width']} cm"
+            comments_text = content.get("comments", "")
+            if not comments_text:
+                # Empty comment → use white color
+                comment_color = colors.white
+            else:
+                comment_color = colors.black
 
             text_content = f"""
             作品名稱: {content['title']}<br/>
-            作     者: {content['author']}<br/>
             尺     寸: {size_display}<br/>
             創作媒材: {content['medium']}<br/>
-            創作日期: {content.get('date', '')}
+            創作日期: {content.get('date', '')}<br/>
+            <font color="{comment_color.hexval()}">備註\t: {comments_text}</font>
             """
 
             paragraph = Paragraph(text_content, style)
