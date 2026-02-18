@@ -1,8 +1,8 @@
 # Gallery Labels
 
-Gallery Labels is a Shiny for Python dashboard for creating, managing, and exporting exhibition labels formatted for print (fractional A4 size cards).
+Gallery Labels is a Shiny for Python application for creating, managing, and exporting exhibition labels formatted for print (fractional A4 size cards).
 
-The application allows manual entry or bulk upload of artwork metadata and supports export to print-ready PDF (double-spaced, embedded font) and PNG.
+The application allows manual entry or bulk upload of artwork metadata and supports export to print-ready PDF (double-spaced, embedded font)
 
 ---
 
