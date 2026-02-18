@@ -42,5 +42,4 @@ jobs:
 
           # Deploy updates to existing app
           rsconnect deploy shiny src \
-            --title "gallery-labels" \
-            --force-generate
+            --app-id ${{ secrets.SHINYAPPS_APP_ID }}
