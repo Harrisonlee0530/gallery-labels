@@ -3,20 +3,19 @@ import io
 import os
 import uuid
 import base64
+import datetime
 import tempfile
 import pandas as pd
-import datetime
 from reportlab.lib import colors
 from reportlab.lib.units import mm
 from reportlab.pdfgen import canvas
 from datetime import datetime as dd
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfbase import pdfmetrics
-from reportlab.platypus import Image as RLImage
-from reportlab.lib.styles import ParagraphStyle
-from reportlab.pdfbase.cidfonts import UnicodeCIDFont
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+from reportlab.platypus import Paragraph
 from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.lib.styles import ParagraphStyle
+from reportlab.platypus import Image as RLImage
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 font_path = os.path.join(BASE_DIR, "fonts", "NotoSansTC-Regular.ttf")
@@ -48,10 +47,6 @@ def format_date(raw_date):
 
     # fallback: return raw if parsing fails
     return raw_date
-
-
-# ---------- Reactive Store ----------
-cards = reactive.Value({})
 
 
 # ---------- UI ----------
@@ -137,13 +132,13 @@ app_ui = ui.page_fluid(
             ui.input_numeric("quantity", "數量", value=1, min=1, step=1),
             ui.input_action_button("add", "Add Card"),
             ui.hr(),
-            ui.input_select("delete_select", "Select Card", choices=[]),
+            ui.input_select("delete_select", "Select Card", choices={}),
             ui.input_action_button("delete", "Delete Card"),
             ui.hr(),
             ui.download_button("download_pdf", "Download PDF"),
             # ---------- Last Updated ----------
             ui.tags.p(
-                f"Last Updated: {datetime.datetime.now().strftime('%Y/%m/%d %H:%M %Z')}",
+                f"Last Updated: {datetime.datetime.now().strftime('%Y/%m/%d %H:%M')}",
                 style="font-size:12pt; margin-top:20px; color: gray;",
             ),
         ),
@@ -154,6 +149,8 @@ app_ui = ui.page_fluid(
 
 # ---------- Server ----------
 def server(input, output, session):
+    # ---------- Reactive Store ----------
+    cards = reactive.Value({})
 
     @reactive.effect
     @reactive.event(input.csv_upload)
@@ -196,10 +193,6 @@ def server(input, output, session):
 
         cards.set(data)
 
-        ui.update_select(
-            "delete_select", choices={cid: data[cid]["title"] for cid in data}
-        )
-
     @reactive.effect
     @reactive.event(input.add)
     def add_card():
@@ -211,7 +204,6 @@ def server(input, output, session):
             cid = str(uuid.uuid4())[:8]
             data[cid] = {
                 "title": input.title(),
-                # "author": input.author(),
                 "height": input.height(),
                 "width": input.width(),
                 "medium": input.medium(),
@@ -220,18 +212,6 @@ def server(input, output, session):
             }
 
         cards.set(data)
-
-        # Update dropdown with indexed labels
-        choices = {}
-        counter = {}
-
-        for cid, content in data.items():
-            title = content["title"]
-            counter[title] = counter.get(title, 0) + 1
-            label = f"{title} ({counter[title]})"
-            choices[cid] = label
-
-        ui.update_select("delete_select", choices=choices)
 
     @reactive.effect
     @reactive.event(input.delete)
@@ -242,17 +222,21 @@ def server(input, output, session):
             data.pop(selected, None)
             cards.set(data)
 
-            # rebuild dropdown
-            choices = {}
-            counter = {}
+    # Automatically update dropdown whenever cards change
+    @reactive.effect
+    def _update_dropdown():
+        data = cards.get()
+        # rebuild dropdown
+        choices = {}
+        counter = {}
 
-            for cid, content in data.items():
-                title = content["title"]
-                counter[title] = counter.get(title, 0) + 1
-                label = f"{title} ({counter[title]})"
-                choices[cid] = label
+        for cid, content in data.items():
+            title = content["title"]
+            counter[title] = counter.get(title, 0) + 1
+            label = f"{title} ({counter[title]})"
+            choices[cid] = label
 
-            ui.update_select("delete_select", choices=choices)
+        ui.update_select("delete_select", choices=choices, session=session)
 
     # ---------- Render Cards ----------
     @output
@@ -271,8 +255,7 @@ def server(input, output, session):
                 {"class": "art-card"},
                 ui.tags.img(src=f"data:image/png;base64,{HEADER_BASE64}"),
                 ui.div({"class": "card-line"}, f"作品名稱: {content['title']}"),
-                # ui.div({"class": "card-line"}, f"作   者: {content['author']}"),
-                ui.div({"class": "card-line"}, f"尺   寸: {size_display}"),
+                ui.div({"class": "card-line"}, f"作品尺寸: {size_display}"),
                 ui.div({"class": "card-line"}, f"創作媒材: {content['medium']}"),
                 ui.div({"class": "card-line"}, f"創作日期: {content.get('date', '')}"),
                 ui.div(
@@ -356,7 +339,7 @@ def server(input, output, session):
 
             text_content = f"""
             作品名稱: {content['title']}<br/>
-            尺     寸: {size_display}<br/>
+            作品尺寸: {size_display}<br/>
             創作媒材: {content['medium']}<br/>
             創作日期: {content.get('date', '')}<br/>
             <font color="{comment_color.hexval()}">備註\t: {comments_text}</font>
