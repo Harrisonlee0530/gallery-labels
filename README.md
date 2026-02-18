@@ -1,4 +1,3 @@
-````markdown
 # Gallery Labels
 
 Gallery Labels is a Shiny for Python dashboard for creating, managing, and exporting exhibition labels formatted for print (fractional A4 size cards).
